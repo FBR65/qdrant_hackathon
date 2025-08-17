@@ -1,0 +1,41 @@
+[project]
+name = "qdrant-hackathon"
+version = "0.1.0"
+description = "Qdrant Hackathon Project with Gradio Interface for Image Search and Processing"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "gradio>=5.34.0",
+    "qdrant-client>=1.13.3",
+    "ollama>=0.4.8",
+    "pillow>=11.2.1",
+    "requests>=2.32.3",
+    "transformers>=4.49.0",
+    "torch>=2.5.0",
+    "sentence-transformers>=3.4.1",
+    "piexif>=1.1.3",
+    "exifread>=3.2.0",
+    "geopy>=2.4.1",
+    "numpy>=1.26.0",
+    "pandas>=2.2.0",
+    "tqdm>=4.67.1",
+    "openai>=1.30.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "black>=24.0.0",
+    "flake8>=7.0.0",
+    "mypy>=1.10.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["."]
+
+[project.scripts]
+qdrant-hackathon = "qdrant_hackathon.main:main"
