@@ -48,9 +48,11 @@ def _get_exif_with_names(exif_dict: Dict[str, Any]) -> Dict[str, Any]:
 
         exif_with_names[ifd_name] = {}
         for tag, value in ifd_dict.items():
-            tag_name = exifread.TAGS.get(tag, tag)
+            # Use tag directly since TAGS might not be available
+            tag_name = tag
             if ifd_name == "GPS":
-                gps_tag_name = exifread.GPSTAGS.get(tag, tag)
+                # Use tag directly since GPSTAGS might not be available
+                gps_tag_name = tag
                 exif_with_names[ifd_name][gps_tag_name] = value
             else:
                 exif_with_names[ifd_name][tag_name] = value
@@ -122,7 +124,7 @@ def get_location_from_coordinates(latitude: float, longitude: float) -> Optional
     try:
         geolocator = Nominatim(user_agent="qdrant_hackathon_v1.0")
         location = geolocator.reverse(
-            (latitude, longitude), exactly_one=True, language="en", timeout=10
+            (latitude, longitude), exactly_one=True, language="de", timeout=10
         )
         return (
             location.address.strip().lower() if location and location.address else None

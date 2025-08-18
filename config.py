@@ -37,7 +37,7 @@ class Config:
 
     # Gradio Configuration
     SERVER_NAME: str = "0.0.0.0"
-    SERVER_PORT: int = 8504
+    SERVER_PORT: int = 7860
     SHARE: bool = False
 
     # Allowed Paths Configuration
@@ -51,9 +51,10 @@ class Config:
     def get_allowed_paths(cls) -> List[str]:
         """Get allowed paths for file access."""
         if not cls.ALLOWED_PATHS:
-            # Default to user's home directory
+            # Default to user's home directory and current working directory
             home_dir = os.path.expanduser("~")
-            return [home_dir]
+            current_dir = os.getcwd()
+            return [home_dir, current_dir]
         return cls.ALLOWED_PATHS
 
     @classmethod

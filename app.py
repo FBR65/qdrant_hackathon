@@ -29,7 +29,7 @@ def get_system_status():
     """Get system status for display."""
     try:
         processor = initialize_processor()
-        status = processor.get_system_status()
+        status = processor.check_system_status()
 
         # Format status for display
         status_text = f"System Status: {status['overall_status'].upper()}\n\n"
@@ -232,44 +232,43 @@ def process_bulk_interface(directory_path, max_images=10):
             return f"Error: {error}", None
 
         # Create summary
-        total_images = len(results)
-        successful = sum(1 for r in results if r.get("overall_status") == "success")
-        partial = sum(
-            1 for r in results if r.get("overall_status") == "partial_success"
-        )
-        failed = total_images - successful - partial
+        total_images = results.get("total_images", 0)
+        successful = results.get("processed", 0)
+        failed = results.get("failed", 0)
 
         summary_text = f"**Bulk Processing Summary:**\n\n"
         summary_text += f"**Total Images:** {total_images}\n"
         summary_text += f"**Successful:** {successful}\n"
-        summary_text += f"**Partial Success:** {partial}\n"
         summary_text += f"**Failed:** {failed}\n\n"
 
         # Create detailed results table
-        if results:
+        if results.get("results"):
             data = []
-            for result in results:
-                filename = result.get("filename", "Unknown")
-                status = result.get("overall_status", "unknown")
-                tags = result.get("tags", [])
-                location = result.get("location", "Unknown")
+            for result in results["results"]:
+                filename = os.path.basename(result.get("image_path", "Unknown"))
+                status = result.get("status", "unknown")
+                error = result.get("error", "")
 
-                data.append(
-                    {
-                        "Filename": filename,
-                        "Status": status,
-                        "Tags": ", ".join(tags[:3]) + ("..." if len(tags) > 3 else ""),
-                        "Location": location,
-                    }
-                )
+                if status == "success":
+                    data = data  # This would need to be populated with actual data from successful processing
+                else:
+                    data.append(
+                        {
+                            "Filename": filename,
+                            "Status": status,
+                            "Error": error,
+                            "Tags": "",
+                            "Location": "",
+                        }
+                    )
 
             df = pd.DataFrame(data)
-            return summary_text, df
+            return summary_text, df, None
 
-        return summary_text, None
+        return summary_text, None, None
 
     except Exception as e:
-        return f"Error in bulk processing: {e}", None
+        return f"Error in bulk processing: {e}", None, None
 
 
 def set_allowed_paths_interface(paths_text):

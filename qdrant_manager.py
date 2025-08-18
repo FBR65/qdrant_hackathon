@@ -42,9 +42,9 @@ class QdrantManager:
     def check_connection(self) -> tuple[bool, Optional[str]]:
         """Check connection to Qdrant server."""
         try:
-            # Try to get server info
-            info = self.client.get_fast()
-            return True, f"Connected to Qdrant server version {info.version}"
+            # Try to check if a collection exists to test connection
+            self.client.collection_exists(collection_name="test_connection")
+            return True, f"Connected to Qdrant server"
         except Exception as e:
             return False, f"Connection failed: {e}"
 

@@ -3,6 +3,8 @@ Ollama client for image tagging and description generation using OpenAI compatib
 """
 
 import json
+import os
+import base64
 import time
 from typing import Dict, Any, List, Optional
 from datetime import datetime
@@ -48,20 +50,57 @@ class OllamaClient:
             Tuple of (tags, error_message)
         """
         try:
+            # DEBUG: Log the image path and check if file exists
+            print(f"DEBUG: Attempting to process image at path: {image_path}")
+            print(f"DEBUG: File exists: {os.path.exists(image_path)}")
+
+            if not os.path.exists(image_path):
+                return [], f"Image file not found: {image_path}"
+
+            # Check file size
+            file_size = os.path.getsize(image_path)
+            print(f"DEBUG: Image file size: {file_size} bytes")
+
+            # Read and encode image as base64
+            with open(image_path, "rb") as image_file:
+                base64_image = base64.b64encode(image_file.read()).decode("utf-8")
+
+            print(
+                f"DEBUG: Image encoded to base64, length: {len(base64_image)} characters"
+            )
+
             # Create a prompt for image tagging
             prompt = f"""
-            Analyze the image at {image_path} and generate descriptive tags.
-            Return exactly {max_tags} tags that describe the image content.
-            Format the response as a JSON array of strings.
-            Example: ["beach", "sunset", "ocean", "sky", "sand", "waves", "tropical", "scenic", "nature", "outdoor"]
+            Analysiere das bereitgestellte Bild und generiere beschreibende Tags.
+            Erstelle genau {max_tags} Tags, die den Bildinhalt beschreiben.
+            Formatiere die Antwort als JSON-Array von Strings.
+            Gib die Tags auf Deutsch aus.
+            Beispiel: ["strand", "sonnenuntergang", "ozean", "himmel", "sand", "wellen", "tropisch", "landschaft", "natur", "draußen"]
             """
+
+            print(f"DEBUG: Sending image and prompt to model: {self.model_name}")
+            print(f"DEBUG: Prompt length: {len(prompt)} characters")
+
+            # Create message with image content
+            message = {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": prompt},
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"},
+                    },
+                ],
+            }
 
             response = self.client.chat.completions.create(
                 model=self.model_name,
-                messages=[{"role": "user", "content": prompt}],
+                messages=[message],
                 max_tokens=500,
                 temperature=0.3,
             )
+
+            print(f"DEBUG: API call successful, response received")
 
             # Extract and parse the response
             content = response.choices[0].message.content.strip()
@@ -118,20 +157,50 @@ class OllamaClient:
             Tuple of (description, error_message)
         """
         try:
+            # DEBUG: Log the image path for description generation
+            print(f"DEBUG: Generating description for image: {image_path}")
+
+            # Read and encode image as base64
+            with open(image_path, "rb") as image_file:
+                base64_image = base64.b64encode(image_file.read()).decode("utf-8")
+
+            print(
+                f"DEBUG: Image encoded to base64 for description, length: {len(base64_image)} characters"
+            )
+
             prompt = f"""
-            Analyze the image at {image_path} and provide a detailed description.
-            Describe the main subjects, setting, colors, mood, and any notable features.
-            Write a coherent paragraph of 3-5 sentences.
+            Analysiere das bereitgestellte Bild und gib eine detaillierte Beschreibung.
+            Beschreibe die Hauptmotive, die Umgebung, Farben, Stimmung und alle bemerkenswerten Merkmale.
+            Schreibe einen zusammenhängenden Absatz von 3-5 Sätzen auf Deutsch.
             """
+
+            print(
+                f"DEBUG: Sending image and description prompt to model: {self.model_name}"
+            )
+
+            # Create message with image content
+            message = {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": prompt},
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"},
+                    },
+                ],
+            }
 
             response = self.client.chat.completions.create(
                 model=self.model_name,
-                messages=[{"role": "user", "content": prompt}],
+                messages=[message],
                 max_tokens=300,
                 temperature=0.7,
             )
 
+            print(f"DEBUG: Description API call successful")
+
             description = response.choices[0].message.content.strip()
+            print(f"DEBUG: Generated description length: {len(description)} characters")
             return description, None
 
         except Exception as e:
@@ -150,15 +219,23 @@ class OllamaClient:
             Tuple of (analysis_result, error_message)
         """
         try:
+            print(f"DEBUG: Starting comprehensive image analysis for: {image_path}")
+
             # Generate tags
+            print(f"DEBUG: Step 1 - Generating tags")
             tags, error = self.generate_tags(image_path)
             if error:
+                print(f"DEBUG: Tag generation failed: {error}")
                 return {"error": error}, error
+            print(f"DEBUG: Generated {len(tags)} tags: {tags}")
 
             # Generate description
+            print(f"DEBUG: Step 2 - Generating description")
             description, error = self.generate_description(image_path)
             if error:
+                print(f"DEBUG: Description generation failed: {error}")
                 return {"error": error}, error
+            print(f"DEBUG: Description generated successfully")
 
             # Create analysis result
             result = {
@@ -169,6 +246,7 @@ class OllamaClient:
                 "image_path": image_path,
             }
 
+            print(f"DEBUG: Image analysis completed successfully")
             return result, None
 
         except Exception as e:

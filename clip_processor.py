@@ -76,9 +76,10 @@ class CLIPProcessor:
             # Load and preprocess image
             image = Image.open(image_path).convert("RGB")
 
-            # Process image
+            # Process image - CLIP processor needs both text and image inputs
+            # We'll use a dummy text input since we only want image embeddings
             inputs = self.processor(
-                text=None, images=image, return_tensors="pt", padding=True
+                text=["a photo"], images=image, return_tensors="pt", padding=True
             )
             inputs = {k: v.to(self.device) for k, v in inputs.items()}
 

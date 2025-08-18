@@ -100,19 +100,22 @@ class ImageProcessor:
                 return {"error": "Failed to read image"}, f"Image read error: {e}"
 
             # Extract GPS coordinates
-            gps_coords, gps_error = get_gps_coordinates(image_path)
+            gps_coords = get_gps_coordinates(image_path)
             location_name = None
             if gps_coords:
-                location_name = get_location_from_coordinates(
-                    gps_coords[0], gps_coords[1]
-                )
+                lat, lon = gps_coords
+                location_name = get_location_from_coordinates(lat, lon)
 
             # Generate AI tags and description
+            print(f"DEBUG: Starting AI analysis for image: {image_path}")
             ai_analysis, ai_error = self.ollama_client.generate_image_analysis(
                 image_path
             )
             if ai_error:
+                print(f"DEBUG: AI analysis failed: {ai_error}")
                 return {"error": "AI analysis failed"}, ai_error
+            print(f"DEBUG: AI analysis completed successfully")
+            print(f"DEBUG: AI analysis result: {ai_analysis}")
 
             # Get image embedding
             clip_features, clip_error = self.clip_processor.get_image_features(
