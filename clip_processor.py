@@ -101,7 +101,7 @@ class CLIPProcessor:
 
     def get_text_embedding(self, text: str) -> np.ndarray:
         """
-        Get text embedding using sentence transformer.
+        Get text embedding using CLIP model for consistency.
 
         Args:
             text: Input text
@@ -110,12 +110,30 @@ class CLIPProcessor:
             Text embedding as numpy array
         """
         try:
-            # Use sentence transformer for text embeddings
-            embedding = self.sentence_model.encode(text)
+            # Use CLIP model for text embeddings to ensure 512-dimensional output
+            inputs = self.processor(text=[text], return_tensors="pt", padding=True)
+            inputs = {k: v.to(self.device) for k, v in inputs.items()}
+
+            with torch.no_grad():
+                outputs = self.model(**inputs)
+                text_features = outputs.text_embeds
+
+                # Normalize embeddings
+                text_features = torch.nn.functional.normalize(
+                    text_features, p=2, dim=1
+                )
+                embedding = text_features.cpu().numpy().flatten()
+
             return embedding
         except Exception as e:
             print(f"Error getting text embedding: {e}")
-            return np.array([])
+            # Fallback to sentence transformer if CLIP fails
+            try:
+                embedding = self.sentence_model.encode(text)
+                return embedding
+            except Exception as fallback_e:
+                print(f"Fallback also failed: {fallback_e}")
+                return np.array([])
 
     def get_image_features(
         self, image_path: str
@@ -178,6 +196,8 @@ class CLIPProcessor:
             "model_path": self.model_path,
             "device": str(self.device),
             "embedding_dim": 512,  # CLIP-ViT-B-32 produces 512-dimensional embeddings
+            "text_embeddings": "CLIP",  # Using CLIP for text embeddings
+            "image_embeddings": "CLIP",  # Using CLIP for image embeddings
             "timestamp": time.time(),
         }
 

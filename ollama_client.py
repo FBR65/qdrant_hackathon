@@ -106,8 +106,18 @@ class OllamaClient:
             content = response.choices[0].message.content.strip()
 
             try:
+                # Clean up malformed JSON responses
+                clean_content = content
+                # Remove markdown code block markers
+                if clean_content.startswith("```json"):
+                    clean_content = clean_content[7:]  # Remove ```json
+                if clean_content.startswith("```"):
+                    clean_content = clean_content[3:]  # Remove ```
+                if clean_content.endswith("```"):
+                    clean_content = clean_content[:-3]  # Remove trailing ```
+                
                 # Try to parse as JSON first
-                tags = json.loads(content)
+                tags = json.loads(clean_content)
                 if isinstance(tags, list):
                     # Clean and filter tags
                     clean_tags = []
@@ -116,6 +126,13 @@ class OllamaClient:
                             clean_tag = tag.strip().lower()
                             if len(clean_tag) > 1:  # Filter out very short tags
                                 clean_tags.append(clean_tag)
+                        elif isinstance(tag, list):
+                            # Handle nested arrays (sometimes AI returns arrays of arrays)
+                            for sub_tag in tag:
+                                if isinstance(sub_tag, str) and sub_tag.strip():
+                                    clean_sub_tag = sub_tag.strip().lower()
+                                    if len(clean_sub_tag) > 1:
+                                        clean_tags.append(clean_sub_tag)
 
                     # Limit to max_tags
                     return clean_tags[:max_tags], None

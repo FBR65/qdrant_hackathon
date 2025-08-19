@@ -275,40 +275,73 @@ class ImageProcessor:
         text_query: str = None,
         tags: List[str] = None,
         limit: int = 10,
+        query_image_path: str = None,
     ) -> Tuple[Dict[str, Any], Optional[str]]:
         """
         Search for similar images.
 
         Args:
             query_embedding: Query embedding vector
-            text_query: Text query for semantic search
+            text_query: Text query for metadata search (not vector search)
             tags: List of tags to filter by
             limit: Maximum number of results
+            query_image_path: Path to query image for similarity search
 
         Returns:
             Tuple of (results, error_message)
         """
         try:
-            # Generate embedding from text query if provided
-            if text_query and not query_embedding:
-                query_embedding = self.clip_processor.get_text_embedding(
-                    text_query
-                ).tolist()
+            # Use vector search for image queries
+            if query_image_path:
+                if not os.path.exists(query_image_path):
+                    return {"error": "Query image not found"}, f"Query image not found: {query_image_path}"
+                
+                clip_features, clip_error = self.clip_processor.get_image_features(query_image_path)
+                if clip_error:
+                    return {"error": "Failed to process query image"}, clip_error
+                query_embedding = clip_features.get("embedding", [])
 
-            if not query_embedding:
+                # Use vector search for image similarity
+                results, error = self.qdrant_manager.search_similar_images(
+                    query_embedding=query_embedding, limit=limit
+                )
+
+                if error:
+                    return {"error": "Vector search failed"}, error
+
+                query_type = "image"
+
+            # Use metadata search for text queries
+            elif text_query or tags:
+                # Use metadata search instead of vector search for text
+                results, error = self.qdrant_manager.search_metadata(
+                    text_query=text_query,
+                    tags=tags,
+                    limit=limit
+                )
+
+                if error:
+                    return {"error": "Metadata search failed"}, error
+
+                query_type = "text"
+
+            # Use vector search for embedding queries
+            elif query_embedding:
+                results, error = self.qdrant_manager.search_similar_images(
+                    query_embedding=query_embedding, limit=limit
+                )
+
+                if error:
+                    return {"error": "Vector search failed"}, error
+
+                query_type = "embedding"
+
+            else:
                 return {
                     "error": "No query provided"
-                }, "Please provide either text query or embedding"
+                }, "Please provide either text query, embedding, or query image path"
 
-            # Search for similar images
-            results, error = self.qdrant_manager.search_similar_images(
-                query_embedding=query_embedding, limit=limit
-            )
-
-            if error:
-                return {"error": "Search failed"}, error
-
-            # Filter by tags if provided
+            # Filter by tags if provided (additional filtering)
             if tags:
                 filtered_results = []
                 for result in results:
@@ -324,7 +357,7 @@ class ImageProcessor:
                 results = filtered_results
 
             return {
-                "query": text_query or "embedding",
+                "query": query_type,
                 "results": results,
                 "total_found": len(results),
                 "limit": limit,

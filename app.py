@@ -132,7 +132,7 @@ def process_single_image_interface(image_file):
 
 
 def search_images_interface(
-    search_type, query_image=None, search_text="", search_tags="", search_location=""
+    search_type, query_image=None, search_text="", search_tags=""
 ):
     """Search for similar images."""
     try:
@@ -146,20 +146,23 @@ def search_images_interface(
             if search_tags
             else None
         )
-        search_location_str = search_location.strip() if search_location else None
 
         if search_type == "image" and query_image is not None:
-            # Save uploaded image temporarily
+            # Copy the image to a temporary location to ensure it persists
+            import shutil
             temp_path = f"temp_search_{datetime.now().strftime('%Y%m%d_%H%M%S')}.jpg"
-            query_image.save(temp_path)
-            query_path = temp_path
+            try:
+                shutil.copy2(query_image, temp_path)
+                query_path = temp_path
+            except Exception as e:
+                print(f"Error copying image: {e}")
+                return [], f"Error processing query image: {e}"
 
         # Perform search
-        results, error = processor.search_similar_images(
+        results, error = processor.search_images(
             query_image_path=query_path,
-            query_text=query_text,
-            search_tags=search_tags_list,
-            search_location=search_location_str,
+            text_query=query_text,
+            tags=search_tags_list,
             limit=10,
         )
 
@@ -172,9 +175,9 @@ def search_images_interface(
 
         # Format results for gallery
         gallery_images = []
-        for result in results:
+        for result in results.get("results", []):
             payload = result.get("payload", {})
-            image_path = payload.get("filepath")
+            image_path = payload.get("file_path")
 
             if image_path and os.path.exists(image_path):
                 try:
@@ -185,8 +188,8 @@ def search_images_interface(
                     distance = result.get("distance_metric", "unknown")
 
                     # Create label with metadata
-                    tags = payload.get("tags", [])
-                    location = payload.get("location", "")
+                    tags = payload.get("ai_tags", [])
+                    location = payload.get("location_name", "")
                     label_parts = [f"Score: {score:.3f} ({distance})"]
                     if tags:
                         label_parts.append(
@@ -359,11 +362,6 @@ with gr.Blocks(theme=gr.themes.Monochrome()) as demo:
                         placeholder="tag1, tag2, tag3...",
                     )
 
-                    search_location = gr.Textbox(
-                        label="Search Location",
-                        placeholder="Enter location to filter...",
-                    )
-
                     search_button = gr.Button("🔍 Search Images", variant="primary")
 
                 with gr.Column():
@@ -390,7 +388,6 @@ with gr.Blocks(theme=gr.themes.Monochrome()) as demo:
                     query_image,
                     search_text,
                     search_tags,
-                    search_location,
                 ],
                 outputs=[search_results, search_error],
             )

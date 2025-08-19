@@ -167,6 +167,120 @@ class QdrantManager:
         except Exception as e:
             return [], f"Search failed: {e}"
 
+    def search_metadata(
+        self,
+        text_query: str = None,
+        tags: List[str] = None,
+        location: str = None,
+        limit: int = 10,
+        distance_metric: str = "cosine",
+    ) -> tuple[List[Dict[str, Any]], Optional[str]]:
+        """
+        Search for images based on metadata (text, tags, location) using Qdrant's filter functionality.
+
+        Args:
+            text_query: Text query to search in description and other text fields
+            tags: List of tags to filter by
+            location: Location to filter by
+            limit: Maximum number of results
+            distance_metric: Distance metric to use (for consistency, though not used in metadata search)
+
+        Returns:
+            Tuple of (results, error_message)
+        """
+        try:
+            collection_name = Config.get_qdrant_collection_name(distance_metric)
+
+            # Build filter conditions
+            must_conditions = []
+
+            # Add text query filter if provided
+            if text_query:
+                # Use keyword search for better text matching
+                # Since MatchValue is too restrictive, we'll use a different approach
+                # We'll search for the text as a substring in the description
+                text_condition = models.FieldCondition(
+                    key="ai_description",
+                    match=models.MatchText(text=text_query),
+                )
+                must_conditions.append(text_condition)
+
+            # Add tags filter if provided
+            if tags:
+                # For multiple tags, we need to create individual conditions
+                # since MatchText with multiple terms doesn't work well
+                for tag in tags:
+                    tags_condition = models.FieldCondition(
+                        key="ai_tags",
+                        match=models.MatchValue(value=tag),
+                    )
+                    must_conditions.append(tags_condition)
+
+            # Add location filter if provided
+            if location:
+                location_condition = models.FieldCondition(
+                    key="location_name",
+                    match=models.MatchValue(value=location),
+                )
+                must_conditions.append(location_condition)
+
+            # If no conditions, return empty results
+            if not must_conditions:
+                return [], "No search criteria provided"
+
+            # Create combined filter
+            query_filter = models.Filter(must=must_conditions)
+
+            # Search with filters using the correct method
+            try:
+                # Use search method instead of query_points for better filter support
+                search_result = self.client.search(
+                    collection_name=collection_name,
+                    query_vector=[0] * 512,  # Dummy query vector
+                    query_filter=query_filter,
+                    limit=limit,
+                    with_payload=True,
+                )
+            except Exception as e:
+                # If search fails, try query_points without score_threshold
+                search_result = self.client.query_points(
+                    collection_name=collection_name,
+                    query=[0] * 512,  # Dummy query vector
+                    query_filter=query_filter,
+                    limit=limit,
+                    with_payload=True,
+                )
+
+            # Process results
+            results = []
+            
+            # Handle different response formats
+            if hasattr(search_result, 'points'):
+                # query_points response format
+                for point in search_result.points:
+                    result = {
+                        "id": point.id,
+                        "score": 1.0,  # Default score for metadata matches
+                        "payload": point.payload,
+                        "distance": None,  # No distance for metadata search
+                    }
+                    results.append(result)
+            else:
+                # search response format
+                for hit in search_result:
+                    result = {
+                        "id": hit.id,
+                        "score": hit.score,
+                        "payload": hit.payload,
+                        "distance": hit.distance if hasattr(hit, 'distance') else None,
+                    }
+                    results.append(result)
+
+            return results, None
+
+        except Exception as e:
+            return [], f"Metadata search failed: {e}"
+
     def get_image_by_id(
         self, image_id: str, distance_metric: str = "cosine"
     ) -> tuple[Optional[Dict[str, Any]], Optional[str]]:

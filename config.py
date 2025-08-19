@@ -10,15 +10,15 @@ class Config:
     """Configuration class for the application."""
 
     # Qdrant Configuration
-    QDRANT_HOST: str = "localhost"
+    QDRANT_HOST: str = "10.84.0.7"#"localhost"
     QDRANT_PORT: int = 6333
     QDRANT_TIMEOUT: int = 120
     COLLECTION_NAME: str = "image_db"
 
     # Ollama/OpenAI Configuration
-    OLLAMA_BASE_URL: str = "http://localhost:11434/v1/"
-    OLLAMA_MODEL: str = "mistral-small3.2:latest"
-    OLLAMA_API_KEY: str = "ollama"
+    OLLAMA_BASE_URL: str = "http://10.84.0.7:8080/v1/" #"http://localhost:11434/v1/"
+    OLLAMA_MODEL: str = "mistralai/Mistral-Small-3.2-24B-Instruct-2506" #"mistral-small3.2:latest"
+    OLLAMA_API_KEY: str = "na" #"ollama"
 
     # CLIP Model Configuration
     CLIP_MODEL_NAME: str = "laion/clip-vit-b-32-laion2B-s34B-b79K"
