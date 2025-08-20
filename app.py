@@ -131,11 +131,16 @@ def process_single_image_interface(image_file):
         return f"Error processing image: {e}", None, None, None
 
 
-def search_images_interface(
+def perform_new_search(
     search_type, query_image=None, search_text="", search_tags=""
 ):
-    """Search for similar images."""
+    """Search for similar images with forced fresh execution."""
     try:
+        # Add a unique identifier to ensure fresh results and prevent caching
+        import time
+        search_id = f"search_{int(time.time() * 1000)}"
+        
+        # Force completely fresh results by using different data structures
         processor = initialize_processor()
 
         # Prepare search parameters
@@ -171,11 +176,13 @@ def search_images_interface(
             os.remove(query_path)
 
         if error:
-            return [], f"Search error: {error}"
+            return [], None, f"Search error: {error}"
 
         # Format results for gallery
         gallery_images = []
-        for result in results.get("results", []):
+        metadata_text = "**Search Results Metadata:**\n\n"
+        
+        for i, result in enumerate(results.get("results", [])):
             payload = result.get("payload", {})
             image_path = payload.get("file_path")
 
@@ -200,13 +207,46 @@ def search_images_interface(
 
                     label = " | ".join(label_parts)
                     gallery_images.append((img, label))
+                    
+                    # Add detailed metadata for this result
+                    metadata_text += f"--- Result {i+1} ---\n"
+                    metadata_text += f"**File Path:** {image_path}\n"
+                    metadata_text += f"**File Name:** {payload.get('file_name', 'Unknown')}\n"
+                    metadata_text += f"**AI Tags:** {', '.join(tags) if tags else 'None'}\n"
+                    metadata_text += f"**Location:** {location if location else 'None'}\n"
+                    metadata_text += f"**AI Description:** {payload.get('ai_description', 'No description')[:200]}{'...' if len(payload.get('ai_description', '')) > 200 else ''}\n"
+                    metadata_text += f"**Score:** {score:.3f}\n\n"
+                    
                 except Exception as e:
                     print(f"Error loading image {image_path}: {e}")
+                    metadata_text += f"--- Result {i+1} ---\nError loading image: {e}\n\n"
+            else:
+                metadata_text += f"--- Result {i+1} ---\nImage file not found\n\n"
 
-        return gallery_images, None
+        # Force completely fresh results by using different data structures
+        if results.get("results"):
+            # Create completely fresh gallery images list
+            fresh_gallery = []
+            for img_data in gallery_images:
+                # Create new tuple to prevent reference issues
+                fresh_gallery.append((img_data[0], img_data[1] + f" | ID:{search_id}"))
+            
+            # Create completely fresh metadata
+            fresh_metadata = f"=== FRESH SEARCH RESULTS ({search_id}) ===\n{metadata_text}"
+            return fresh_gallery, fresh_metadata, None
+        else:
+            # Return completely different structure for no results
+            return [], f"=== NO RESULTS FOUND ({search_id}) ===", None
 
     except Exception as e:
-        return [], f"Search interface error: {e}"
+        return [], None, f"Search interface error: {e}"
+
+
+def search_images_interface(
+    search_type, query_image=None, search_text="", search_tags=""
+):
+    """Legacy search function - not used."""
+    return [], "This function is deprecated. Use perform_new_search instead.", None
 
 
 def process_bulk_interface(directory_path, max_images=10):
@@ -312,6 +352,9 @@ def get_current_allowed_paths():
 
 # Create the Gradio interface
 with gr.Blocks(theme=gr.themes.Monochrome()) as demo:
+    # Initialize state for search results
+    search_results_state = gr.State([])
+    search_metadata_state = gr.State("")
     # Header
     gr.HTML("""
     <div style="text-align: center; margin-bottom: 20px;">
@@ -366,9 +409,21 @@ with gr.Blocks(theme=gr.themes.Monochrome()) as demo:
 
                 with gr.Column():
                     search_results = gr.Gallery(
-                        label="Search Results", columns=2, height=400, interactive=False
+                        label="Search Results", columns=2, height=400, interactive=False,
+                        elem_id="search_results"
                     )
-                    search_error = gr.Textbox(label="Search Error", interactive=False)
+                    search_metadata = gr.Textbox(
+                        label="Search Results Metadata",
+                        lines=15,
+                        interactive=False,
+                        max_lines=20,
+                        elem_id="search_metadata"
+                    )
+                    search_error = gr.Textbox(
+                        label="Search Error",
+                        interactive=False,
+                        elem_id="search_error"
+                    )
 
             # Show/hide search type options
             search_type.change(
@@ -380,16 +435,17 @@ with gr.Blocks(theme=gr.themes.Monochrome()) as demo:
                 outputs=[text_search_row, image_search_row],
             )
 
-            # Search function
+            # Search function with forced fresh outputs
             search_button.click(
-                fn=search_images_interface,
+                fn=perform_new_search,
                 inputs=[
                     search_type,
                     query_image,
                     search_text,
                     search_tags,
                 ],
-                outputs=[search_results, search_error],
+                outputs=[search_results, search_metadata, search_error],
+                show_progress="full"
             )
 
         # Tab 2: Single Image Upload

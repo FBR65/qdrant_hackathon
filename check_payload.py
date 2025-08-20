@@ -8,6 +8,7 @@ import os
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from qdrant_manager import QdrantManager
+from config import Config
 
 def check_payload_structure():
     """Check the actual payload structure of stored points."""
@@ -17,7 +18,7 @@ def check_payload_structure():
         qdrant_manager = QdrantManager()
         
         # Get first few points from the collection to see actual structure
-        collection_name = "image_db_cosine"
+        collection_name = Config.get_qdrant_collection_name(Config.get_distance_metrics()[0])
         
         try:
             # Use scroll to get actual points

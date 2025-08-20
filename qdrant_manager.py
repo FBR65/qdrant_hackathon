@@ -127,7 +127,7 @@ class QdrantManager:
         self,
         query_embedding: List[float],
         limit: int = 10,
-        distance_metric: str = "cosine",
+        distance_metric: str = None,
     ) -> tuple[List[Dict[str, Any]], Optional[str]]:
         """
         Search for similar images based on embedding similarity.
@@ -141,6 +141,9 @@ class QdrantManager:
             Tuple of (results, error_message)
         """
         try:
+            # Use the first available distance metric if none provided
+            if distance_metric is None:
+                distance_metric = self.distance_metrics[0] if self.distance_metrics else "cosine"
             collection_name = Config.get_qdrant_collection_name(distance_metric)
 
             # Search for similar images
@@ -173,7 +176,7 @@ class QdrantManager:
         tags: List[str] = None,
         location: str = None,
         limit: int = 10,
-        distance_metric: str = "cosine",
+        distance_metric: str = None,
     ) -> tuple[List[Dict[str, Any]], Optional[str]]:
         """
         Search for images based on metadata (text, tags, location) using Qdrant's filter functionality.
@@ -189,26 +192,37 @@ class QdrantManager:
             Tuple of (results, error_message)
         """
         try:
+            # Use the first available distance metric if none provided
+            if distance_metric is None:
+                distance_metric = self.distance_metrics[0] if self.distance_metrics else "cosine"
             collection_name = Config.get_qdrant_collection_name(distance_metric)
 
             # Build filter conditions
             must_conditions = []
+            should_conditions = []
 
-            # Add text query filter if provided
+            # Add text query filter if provided - search in description, location_name, or ai_tags
             if text_query:
-                # Use keyword search for better text matching
-                # Since MatchValue is too restrictive, we'll use a different approach
-                # We'll search for the text as a substring in the description
-                text_condition = models.FieldCondition(
+                # Create conditions for each field we want to search in
+                description_condition = models.FieldCondition(
                     key="ai_description",
                     match=models.MatchText(text=text_query),
                 )
-                must_conditions.append(text_condition)
+                location_condition = models.FieldCondition(
+                    key="location_name",
+                    match=models.MatchText(text=text_query),
+                )
+                tags_condition = models.FieldCondition(
+                    key="ai_tags",
+                    match=models.MatchText(text=text_query),
+                )
+                
+                # Use should clause to match any of these fields
+                should_conditions.extend([description_condition, location_condition, tags_condition])
 
             # Add tags filter if provided
             if tags:
                 # For multiple tags, we need to create individual conditions
-                # since MatchText with multiple terms doesn't work well
                 for tag in tags:
                     tags_condition = models.FieldCondition(
                         key="ai_tags",
@@ -225,11 +239,31 @@ class QdrantManager:
                 must_conditions.append(location_condition)
 
             # If no conditions, return empty results
-            if not must_conditions:
+            if not must_conditions and not should_conditions:
                 return [], "No search criteria provided"
 
             # Create combined filter
-            query_filter = models.Filter(must=must_conditions)
+            if should_conditions and must_conditions:
+                # If we have both should and must conditions
+                # Use must for required conditions and should for optional text matches
+                query_filter = models.Filter(
+                    must=must_conditions,
+                    should=should_conditions
+                )
+            elif should_conditions:
+                # If we only have should conditions (text search)
+                # For OR logic, we need to use a simpler approach
+                # Use any() to find matches in any of the text fields
+                query_filter = models.Filter(
+                    must=[
+                        models.Filter(
+                            should=should_conditions
+                        )
+                    ]
+                )
+            else:
+                # If we only have must conditions (tag/location search)
+                query_filter = models.Filter(must=must_conditions)
 
             # Search with filters using the correct method
             try:
@@ -295,6 +329,9 @@ class QdrantManager:
             Tuple of (image_data, error_message)
         """
         try:
+            # Use the first available distance metric if none provided
+            if distance_metric is None:
+                distance_metric = self.distance_metrics[0] if self.distance_metrics else "cosine"
             collection_name = Config.get_qdrant_collection_name(distance_metric)
 
             # Get image data
@@ -361,6 +398,9 @@ class QdrantManager:
             Tuple of (stats, error_message)
         """
         try:
+            # Use the first available distance metric if none provided
+            if distance_metric is None:
+                distance_metric = self.distance_metrics[0] if self.distance_metrics else "cosine"
             collection_name = Config.get_qdrant_collection_name(distance_metric)
 
             # Get collection info
