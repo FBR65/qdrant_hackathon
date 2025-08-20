@@ -140,8 +140,23 @@ def perform_new_search(
         import time
         search_id = f"search_{int(time.time() * 1000)}"
         
+        # Reset input parameters to ensure fresh state
+        if search_type == "image":
+            search_text = ""  # Clear text when doing image search
+            search_tags = ""  # Clear tags when doing image search
+        else:  # text search
+            query_image = None  # Clear image when doing text search
+        
         # Force completely fresh results by using different data structures
         processor = initialize_processor()
+        
+        # Prepare search parameters with cleaned inputs
+        query_text = search_text.strip() if search_text else None
+        search_tags_list = (
+            [tag.strip() for tag in search_tags.split(",") if tag.strip()]
+            if search_tags
+            else None
+        )
 
         # Prepare search parameters
         query_path = None
@@ -214,7 +229,7 @@ def perform_new_search(
                     metadata_text += f"**File Name:** {payload.get('file_name', 'Unknown')}\n"
                     metadata_text += f"**AI Tags:** {', '.join(tags) if tags else 'None'}\n"
                     metadata_text += f"**Location:** {location if location else 'None'}\n"
-                    metadata_text += f"**AI Description:** {payload.get('ai_description', 'No description')[:200]}{'...' if len(payload.get('ai_description', '')) > 200 else ''}\n"
+                    metadata_text += f"**AI Description:** {payload.get('ai_description', 'No description')}\n"
                     metadata_text += f"**Score:** {score:.3f}\n\n"
                     
                 except Exception as e:
@@ -349,7 +364,6 @@ def get_current_allowed_paths():
     except Exception as e:
         return f"Error getting allowed paths: {e}"
 
-
 # Create the Gradio interface
 with gr.Blocks(theme=gr.themes.Monochrome()) as demo:
     # Initialize state for search results
@@ -425,14 +439,28 @@ with gr.Blocks(theme=gr.themes.Monochrome()) as demo:
                         elem_id="search_error"
                     )
 
-            # Show/hide search type options
+            # Show/hide search type options and clear fields when type changes
+            def on_search_type_change(search_type):
+                # Clear the other search field when type changes
+                if search_type == "text":
+                    return (
+                        gr.Row(visible=True),
+                        gr.Row(visible=False),
+                        gr.Textbox(value=""),  # Clear image search
+                        gr.Textbox(value=""),  # Clear tags
+                    )
+                else:  # image search
+                    return (
+                        gr.Row(visible=False),
+                        gr.Row(visible=True),
+                        gr.Textbox(value=""),  # Clear text search
+                        gr.Textbox(value=""),  # Clear tags
+                    )
+            
             search_type.change(
-                fn=lambda search_type: (
-                    gr.Row(visible=search_type == "text"),
-                    gr.Row(visible=search_type == "image"),
-                ),
+                fn=on_search_type_change,
                 inputs=search_type,
-                outputs=[text_search_row, image_search_row],
+                outputs=[text_search_row, image_search_row, search_text, search_tags],
             )
 
             # Search function with forced fresh outputs
@@ -467,9 +495,9 @@ with gr.Blocks(theme=gr.themes.Monochrome()) as demo:
                         label="Image Metadata", lines=8, interactive=False
                     )
 
-                    search_results = gr.Gallery(
-                        label="Similar Images", columns=2, height=300, interactive=False
-                    )
+#                    search_results = gr.Gallery(
+#                        label="Similar Images", columns=2, height=300, interactive=False
+#                    )
 
                     processing_error = gr.Textbox(label="Error", interactive=False)
 
