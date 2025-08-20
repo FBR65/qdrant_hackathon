@@ -82,8 +82,8 @@ def main():
         print(f"Server: {Config.SERVER_NAME}:{Config.SERVER_PORT}")
         print(f"Share: {Config.SHARE}")
         print(f"Allowed Paths: {Config.get_allowed_paths()}")
-        print(f"Ollama URL: {Config.OLLAMA_BASE_URL}")
-        print(f"Ollama Model: {Config.OLLAMA_MODEL}")
+        print(f"URL: {Config.OLLAMA_BASE_URL}")
+        print(f"Model: {Config.OLLAMA_MODEL}")
         print(f"Qdrant: {Config.QDRANT_HOST}:{Config.QDRANT_PORT}")
         print("=====================================")
 

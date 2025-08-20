@@ -499,7 +499,7 @@ with gr.Blocks(theme=gr.themes.Monochrome()) as demo:
                         value=f"""
 Qdrant Host: {Config.QDRANT_HOST}
 Qdrant Port: {Config.QDRANT_PORT}
-Ollama Model: {Config.OLLAMA_MODEL}
+Used Model: {Config.OLLAMA_MODEL}
 CLIP Model: {Config.CLIP_MODEL_NAME}
 Server Port: {Config.SERVER_PORT}
                         """,

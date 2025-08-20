@@ -16,9 +16,9 @@ class Config:
     COLLECTION_NAME: str = "image_db"
 
     # Ollama/OpenAI Configuration
-    OLLAMA_BASE_URL: str = "http://localhost:11434/v1/"
-    OLLAMA_MODEL: str = "mistral-small3.2:latest"
-    OLLAMA_API_KEY: str = "ollama"
+    OLLAMA_BASE_URL: str = "http://10.84.0.7:8080/v1/" # "http://localhost:11434/v1/"
+    OLLAMA_MODEL: str = "mistralai/Mistral-Small-3.2-24B-Instruct-2506" # "mistral-small3.2:latest"
+    OLLAMA_API_KEY: str = "na" #"ollama"
 
     # CLIP Model Configuration
     CLIP_MODEL_NAME: str = "laion/clip-vit-b-32-laion2B-s34B-b79K"
@@ -70,11 +70,12 @@ class Config:
     @classmethod
     def get_distance_metrics(cls) -> List[str]:
         """Get available distance metrics for Qdrant."""
-        return ["cosine", "euclid", "dot", "manhattan"]
+        """cosine", "euclid", "dot", "manhattan"""
+        return ["manhattan"]
 
     @classmethod
     def get_ollama_model_info(cls) -> dict:
-        """Get Ollama/OpenAI model information."""
+        """Get OpenAI-Compatibel model information."""
         return {
             "model_name": cls.OLLAMA_MODEL,
             "base_url": cls.OLLAMA_BASE_URL,
