@@ -10,18 +10,20 @@ class Config:
     """Configuration class for the application."""
 
     # Qdrant Configuration
-    QDRANT_HOST: str = "10.84.0.7"#"localhost"
+    QDRANT_HOST: str = "localhost"  # "10.84.0.7" #
     QDRANT_PORT: int = 6333
     QDRANT_TIMEOUT: int = 120
     COLLECTION_NAME: str = "image_db"
 
     # Ollama/OpenAI Configuration
-    OLLAMA_BASE_URL: str = "http://10.84.0.7:8080/v1/" # "http://localhost:11434/v1/"
-    OLLAMA_MODEL: str = "mistralai/Mistral-Small-3.2-24B-Instruct-2506" # "mistral-small3.2:latest"
-    OLLAMA_API_KEY: str = "na" #"ollama"
+    OLLAMA_BASE_URL: str = "http://localhost:11434/v1/"  # "http://10.84.0.7:8080/v1/" #
+    OLLAMA_MODEL: str = (
+        "mistral-small3.2:latest"  # "mistralai/Mistral-Small-3.2-24B-Instruct-2506" #
+    )
+    OLLAMA_API_KEY: str = "na"  # "ollama"
 
     # CLIP Model Configuration
-    CLIP_MODEL_NAME: str = "laion/clip-vit-b-32-laion2B-s34B-b79K"
+    CLIP_MODEL_NAME: str = "openai/clip-vit-large-patch14"
     CLIP_MODEL_PATH: Optional[str] = None
 
     # Image Processing Configuration
@@ -71,7 +73,7 @@ class Config:
     def get_distance_metrics(cls) -> List[str]:
         """Get available distance metrics for Qdrant."""
         """cosine", "euclid", "dot", "manhattan"""
-        return ["manhattan"]
+        return ["cosine"]
 
     @classmethod
     def get_ollama_model_info(cls) -> dict:

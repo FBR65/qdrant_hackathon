@@ -73,7 +73,7 @@ class QdrantManager:
                 self.client.create_collection(
                     collection_name=collection_name,
                     vectors_config=models.VectorParams(
-                        size=512,  # CLIP-ViT-B-32 produces 512-dimensional embeddings
+                        size=768,  # CLIP-Model produces 768-dimensional embeddings
                         distance=distance_map.get(distance, models.Distance.COSINE),
                     ),
                 )
@@ -128,6 +128,7 @@ class QdrantManager:
         query_embedding: List[float],
         limit: int = 10,
         distance_metric: str = None,
+        score_threshold: float = None,
     ) -> tuple[List[Dict[str, Any]], Optional[str]]:
         """
         Search for similar images based on embedding similarity.
@@ -143,14 +144,18 @@ class QdrantManager:
         try:
             # Use the first available distance metric if none provided
             if distance_metric is None:
-                distance_metric = self.distance_metrics[0] if self.distance_metrics else "cosine"
+                distance_metric = (
+                    self.distance_metrics[0] if self.distance_metrics else "cosine"
+                )
             collection_name = Config.get_qdrant_collection_name(distance_metric)
 
             # Search for similar images
+            search_params = models.SearchParams(hnsw_ef=256, exact=True)
+
             search_result = self.client.query_points(
                 collection_name=collection_name,
                 query=query_embedding,
-                search_params=models.SearchParams(hnsw_ef=256, exact=True),
+                search_params=search_params,
                 limit=limit,
             )
 
@@ -163,6 +168,17 @@ class QdrantManager:
                     "payload": point.payload,
                     "distance": point.score if distance_metric == "cosine" else None,
                 }
+
+                # DEBUG: Log scores for analysis
+                print(f"DEBUG: Found result with score: {point.score:.3f}")
+
+                # Filter by score threshold if provided
+                if score_threshold is not None and point.score <= score_threshold:
+                    print(
+                        f"DEBUG: Filtering out result with score {point.score:.3f} (<= {score_threshold})"
+                    )
+                    continue
+
                 results.append(result)
 
             return results, None
@@ -177,6 +193,7 @@ class QdrantManager:
         location: str = None,
         limit: int = 10,
         distance_metric: str = None,
+        score_threshold: float = None,
     ) -> tuple[List[Dict[str, Any]], Optional[str]]:
         """
         Search for images based on metadata (text, tags, location) using Qdrant's filter functionality.
@@ -194,7 +211,9 @@ class QdrantManager:
         try:
             # Use the first available distance metric if none provided
             if distance_metric is None:
-                distance_metric = self.distance_metrics[0] if self.distance_metrics else "cosine"
+                distance_metric = (
+                    self.distance_metrics[0] if self.distance_metrics else "cosine"
+                )
             collection_name = Config.get_qdrant_collection_name(distance_metric)
 
             # Build filter conditions
@@ -216,9 +235,11 @@ class QdrantManager:
                     key="ai_tags",
                     match=models.MatchText(text=text_query),
                 )
-                
+
                 # Use should clause to match any of these fields
-                should_conditions.extend([description_condition, location_condition, tags_condition])
+                should_conditions.extend(
+                    [description_condition, location_condition, tags_condition]
+                )
 
             # Add tags filter if provided
             if tags:
@@ -247,19 +268,14 @@ class QdrantManager:
                 # If we have both should and must conditions
                 # Use must for required conditions and should for optional text matches
                 query_filter = models.Filter(
-                    must=must_conditions,
-                    should=should_conditions
+                    must=must_conditions, should=should_conditions
                 )
             elif should_conditions:
                 # If we only have should conditions (text search)
                 # For OR logic, we need to use a simpler approach
                 # Use any() to find matches in any of the text fields
                 query_filter = models.Filter(
-                    must=[
-                        models.Filter(
-                            should=should_conditions
-                        )
-                    ]
+                    must=[models.Filter(should=should_conditions)]
                 )
             else:
                 # If we only have must conditions (tag/location search)
@@ -268,12 +284,20 @@ class QdrantManager:
             # Search with filters using the correct method
             try:
                 # Use search method instead of query_points for better filter support
+                search_params = {}
+                if score_threshold is not None:
+                    search_params["score_threshold"] = score_threshold
+                    print(
+                        f"DEBUG: Using score threshold {score_threshold} for metadata search"
+                    )
+
                 search_result = self.client.search(
                     collection_name=collection_name,
                     query_vector=[0] * 512,  # Dummy query vector
                     query_filter=query_filter,
                     limit=limit,
                     with_payload=True,
+                    **search_params,
                 )
             except Exception as e:
                 # If search fails, try query_points without score_threshold
@@ -287,9 +311,9 @@ class QdrantManager:
 
             # Process results
             results = []
-            
+
             # Handle different response formats
-            if hasattr(search_result, 'points'):
+            if hasattr(search_result, "points"):
                 # query_points response format
                 for point in search_result.points:
                     result = {
@@ -298,6 +322,14 @@ class QdrantManager:
                         "payload": point.payload,
                         "distance": None,  # No distance for metadata search
                     }
+
+                    # Filter by score threshold if provided
+                    if score_threshold is not None and point.score <= score_threshold:
+                        print(
+                            f"DEBUG: Filtering out metadata result with score {point.score:.3f} (<= {score_threshold})"
+                        )
+                        continue
+
                     results.append(result)
             else:
                 # search response format
@@ -306,8 +338,16 @@ class QdrantManager:
                         "id": hit.id,
                         "score": hit.score,
                         "payload": hit.payload,
-                        "distance": hit.distance if hasattr(hit, 'distance') else None,
+                        "distance": hit.distance if hasattr(hit, "distance") else None,
                     }
+
+                    # Filter by score threshold if provided
+                    if score_threshold is not None and hit.score <= score_threshold:
+                        print(
+                            f"DEBUG: Filtering out metadata result with score {hit.score:.3f} (<= {score_threshold})"
+                        )
+                        continue
+
                     results.append(result)
 
             return results, None
@@ -331,7 +371,9 @@ class QdrantManager:
         try:
             # Use the first available distance metric if none provided
             if distance_metric is None:
-                distance_metric = self.distance_metrics[0] if self.distance_metrics else "cosine"
+                distance_metric = (
+                    self.distance_metrics[0] if self.distance_metrics else "cosine"
+                )
             collection_name = Config.get_qdrant_collection_name(distance_metric)
 
             # Get image data
@@ -400,7 +442,9 @@ class QdrantManager:
         try:
             # Use the first available distance metric if none provided
             if distance_metric is None:
-                distance_metric = self.distance_metrics[0] if self.distance_metrics else "cosine"
+                distance_metric = (
+                    self.distance_metrics[0] if self.distance_metrics else "cosine"
+                )
             collection_name = Config.get_qdrant_collection_name(distance_metric)
 
             # Get collection info

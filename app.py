@@ -131,25 +131,24 @@ def process_single_image_interface(image_file):
         return f"Error processing image: {e}", None, None, None
 
 
-def perform_new_search(
-    search_type, query_image=None, search_text="", search_tags=""
-):
+def perform_new_search(search_type, query_image=None, search_text="", search_tags=""):
     """Search for similar images with forced fresh execution."""
     try:
         # Add a unique identifier to ensure fresh results and prevent caching
         import time
+
         search_id = f"search_{int(time.time() * 1000)}"
-        
+
         # Reset input parameters to ensure fresh state
         if search_type == "image":
             search_text = ""  # Clear text when doing image search
             search_tags = ""  # Clear tags when doing image search
         else:  # text search
             query_image = None  # Clear image when doing text search
-        
+
         # Force completely fresh results by using different data structures
         processor = initialize_processor()
-        
+
         # Prepare search parameters with cleaned inputs
         query_text = search_text.strip() if search_text else None
         search_tags_list = (
@@ -170,6 +169,7 @@ def perform_new_search(
         if search_type == "image" and query_image is not None:
             # Copy the image to a temporary location to ensure it persists
             import shutil
+
             temp_path = f"temp_search_{datetime.now().strftime('%Y%m%d_%H%M%S')}.jpg"
             try:
                 shutil.copy2(query_image, temp_path)
@@ -196,18 +196,36 @@ def perform_new_search(
         # Format results for gallery
         gallery_images = []
         metadata_text = "**Search Results Metadata:**\n\n"
-        
+
         for i, result in enumerate(results.get("results", [])):
             payload = result.get("payload", {})
             image_path = payload.get("file_path")
+            score = result.get("score", 0)
+            distance = result.get(
+                "distance_metric",
+                Config.get_distance_metrics()[0]
+                if Config.get_distance_metrics()
+                else "cosine",
+            )
+
+            # DEBUG: Log scores for analysis
+            print(
+                f"DEBUG: Result {i + 1} - Score: {score:.3f}, Distance: {distance}, Path: {image_path}"
+            )
+
+            # Filter out results with score <= 0.6
+            if score <= 0.6:
+                print(f"DEBUG: Filtering out result with score {score:.3f} (<= 0.6)")
+                metadata_text += f"--- Result {i + 1} (FILTERED OUT) ---\n"
+                metadata_text += f"**File Path:** {image_path}\n"
+                metadata_text += f"**Score:** {score:.3f} (<= 0.6 - filtered out)\n\n"
+                continue
 
             if image_path and os.path.exists(image_path):
                 try:
                     from PIL import Image
 
                     img = Image.open(image_path)
-                    score = result.get("score", 0)
-                    distance = result.get("distance_metric", "unknown")
 
                     # Create label with metadata
                     tags = payload.get("ai_tags", [])
@@ -222,21 +240,29 @@ def perform_new_search(
 
                     label = " | ".join(label_parts)
                     gallery_images.append((img, label))
-                    
+
                     # Add detailed metadata for this result
-                    metadata_text += f"--- Result {i+1} ---\n"
+                    metadata_text += f"--- Result {i + 1} ---\n"
                     metadata_text += f"**File Path:** {image_path}\n"
-                    metadata_text += f"**File Name:** {payload.get('file_name', 'Unknown')}\n"
-                    metadata_text += f"**AI Tags:** {', '.join(tags) if tags else 'None'}\n"
-                    metadata_text += f"**Location:** {location if location else 'None'}\n"
+                    metadata_text += (
+                        f"**File Name:** {payload.get('file_name', 'Unknown')}\n"
+                    )
+                    metadata_text += (
+                        f"**AI Tags:** {', '.join(tags) if tags else 'None'}\n"
+                    )
+                    metadata_text += (
+                        f"**Location:** {location if location else 'None'}\n"
+                    )
                     metadata_text += f"**AI Description:** {payload.get('ai_description', 'No description')}\n"
                     metadata_text += f"**Score:** {score:.3f}\n\n"
-                    
+
                 except Exception as e:
                     print(f"Error loading image {image_path}: {e}")
-                    metadata_text += f"--- Result {i+1} ---\nError loading image: {e}\n\n"
+                    metadata_text += (
+                        f"--- Result {i + 1} ---\nError loading image: {e}\n\n"
+                    )
             else:
-                metadata_text += f"--- Result {i+1} ---\nImage file not found\n\n"
+                metadata_text += f"--- Result {i + 1} ---\nImage file not found\n\n"
 
         # Force completely fresh results by using different data structures
         if results.get("results"):
@@ -245,9 +271,11 @@ def perform_new_search(
             for img_data in gallery_images:
                 # Create new tuple to prevent reference issues
                 fresh_gallery.append((img_data[0], img_data[1] + f" | ID:{search_id}"))
-            
+
             # Create completely fresh metadata
-            fresh_metadata = f"=== FRESH SEARCH RESULTS ({search_id}) ===\n{metadata_text}"
+            fresh_metadata = (
+                f"=== FRESH SEARCH RESULTS ({search_id}) ===\n{metadata_text}"
+            )
             return fresh_gallery, fresh_metadata, None
         else:
             # Return completely different structure for no results
@@ -364,6 +392,7 @@ def get_current_allowed_paths():
     except Exception as e:
         return f"Error getting allowed paths: {e}"
 
+
 # Create the Gradio interface
 with gr.Blocks(theme=gr.themes.Monochrome()) as demo:
     # Initialize state for search results
@@ -423,20 +452,21 @@ with gr.Blocks(theme=gr.themes.Monochrome()) as demo:
 
                 with gr.Column():
                     search_results = gr.Gallery(
-                        label="Search Results", columns=2, height=400, interactive=False,
-                        elem_id="search_results"
+                        label="Search Results",
+                        columns=2,
+                        height=400,
+                        interactive=False,
+                        elem_id="search_results",
                     )
                     search_metadata = gr.Textbox(
                         label="Search Results Metadata",
                         lines=15,
                         interactive=False,
                         max_lines=20,
-                        elem_id="search_metadata"
+                        elem_id="search_metadata",
                     )
                     search_error = gr.Textbox(
-                        label="Search Error",
-                        interactive=False,
-                        elem_id="search_error"
+                        label="Search Error", interactive=False, elem_id="search_error"
                     )
 
             # Show/hide search type options and clear fields when type changes
@@ -456,7 +486,7 @@ with gr.Blocks(theme=gr.themes.Monochrome()) as demo:
                         gr.Textbox(value=""),  # Clear text search
                         gr.Textbox(value=""),  # Clear tags
                     )
-            
+
             search_type.change(
                 fn=on_search_type_change,
                 inputs=search_type,
@@ -473,7 +503,7 @@ with gr.Blocks(theme=gr.themes.Monochrome()) as demo:
                     search_tags,
                 ],
                 outputs=[search_results, search_metadata, search_error],
-                show_progress="full"
+                show_progress="full",
             )
 
         # Tab 2: Single Image Upload
@@ -495,9 +525,9 @@ with gr.Blocks(theme=gr.themes.Monochrome()) as demo:
                         label="Image Metadata", lines=8, interactive=False
                     )
 
-#                    search_results = gr.Gallery(
-#                        label="Similar Images", columns=2, height=300, interactive=False
-#                    )
+                    #                    search_results = gr.Gallery(
+                    #                        label="Similar Images", columns=2, height=300, interactive=False
+                    #                    )
 
                     processing_error = gr.Textbox(label="Error", interactive=False)
 

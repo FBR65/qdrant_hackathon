@@ -1016,19 +1016,6 @@ wheels = [
 ]
 
 [[package]]
-name = "ollama"
-version = "0.5.3"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "httpx" },
-    { name = "pydantic" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/91/6d/ae96027416dcc2e98c944c050c492789502d7d7c0b95a740f0bb39268632/ollama-0.5.3.tar.gz", hash = "sha256:40b6dff729df3b24e56d4042fd9d37e231cee8e528677e0d085413a1d6692394", size = 43331 }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/be/f6/2091e50b8b6c3e6901f6eab283d5efd66fb71c86ddb1b4d68766c3eeba0f/ollama-0.5.3-py3-none-any.whl", hash = "sha256:a8303b413d99a9043dbf77ebf11ced672396b59bec27e6d5db67c88f01b279d2", size = 13490 },
-]
-
-[[package]]
 name = "openai"
 version = "1.99.9"
 source = { registry = "https://pypi.org/simple" }
@@ -1549,8 +1536,8 @@ dependencies = [
     { name = "exifread" },
     { name = "geopy" },
     { name = "gradio" },
+    { name = "hf-xet" },
     { name = "numpy" },
-    { name = "ollama" },
     { name = "openai" },
     { name = "pandas" },
     { name = "piexif" },
@@ -1578,9 +1565,9 @@ requires-dist = [
     { name = "flake8", marker = "extra == 'dev'", specifier = ">=7.0.0" },
     { name = "geopy", specifier = ">=2.4.1" },
     { name = "gradio", specifier = ">=5.34.0" },
+    { name = "hf-xet", specifier = ">=1.1.7" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.10.0" },
     { name = "numpy", specifier = ">=1.26.0" },
-    { name = "ollama", specifier = ">=0.4.8" },
     { name = "openai", specifier = ">=1.30.0" },
     { name = "pandas", specifier = ">=2.2.0" },
     { name = "piexif", specifier = ">=1.1.3" },

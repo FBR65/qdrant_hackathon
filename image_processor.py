@@ -294,16 +294,28 @@ class ImageProcessor:
             # Use vector search for image queries
             if query_image_path:
                 if not os.path.exists(query_image_path):
-                    return {"error": "Query image not found"}, f"Query image not found: {query_image_path}"
-                
-                clip_features, clip_error = self.clip_processor.get_image_features(query_image_path)
+                    return {
+                        "error": "Query image not found"
+                    }, f"Query image not found: {query_image_path}"
+
+                clip_features, clip_error = self.clip_processor.get_image_features(
+                    query_image_path
+                )
                 if clip_error:
                     return {"error": "Failed to process query image"}, clip_error
                 query_embedding = clip_features.get("embedding", [])
 
                 # Use vector search for image similarity
+                distance_metric = (
+                    Config.get_distance_metrics()[0]
+                    if Config.get_distance_metrics()
+                    else "cosine"
+                )
                 results, error = self.qdrant_manager.search_similar_images(
-                    query_embedding=query_embedding, limit=limit
+                    query_embedding=query_embedding,
+                    limit=limit,
+                    distance_metric=distance_metric,
+                    score_threshold=0.6,
                 )
 
                 if error:
@@ -315,9 +327,7 @@ class ImageProcessor:
             elif text_query or tags:
                 # Use metadata search instead of vector search for text
                 results, error = self.qdrant_manager.search_metadata(
-                    text_query=text_query,
-                    tags=tags,
-                    limit=limit
+                    text_query=text_query, tags=tags, limit=limit, score_threshold=0.6
                 )
 
                 if error:
@@ -327,8 +337,16 @@ class ImageProcessor:
 
             # Use vector search for embedding queries
             elif query_embedding:
+                distance_metric = (
+                    Config.get_distance_metrics()[0]
+                    if Config.get_distance_metrics()
+                    else "cosine"
+                )
                 results, error = self.qdrant_manager.search_similar_images(
-                    query_embedding=query_embedding, limit=limit
+                    query_embedding=query_embedding,
+                    limit=limit,
+                    distance_metric=distance_metric,
+                    score_threshold=0.6,
                 )
 
                 if error:
