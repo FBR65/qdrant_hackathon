@@ -213,13 +213,15 @@ def perform_new_search(search_type, query_image=None, search_text="", search_tag
                 f"DEBUG: Result {i + 1} - Score: {score:.3f}, Distance: {distance}, Path: {image_path}"
             )
 
-            # Filter out results with score <= 0.6
-            if score <= 0.6:
-                print(f"DEBUG: Filtering out result with score {score:.3f} (<= 0.6)")
+            # Only apply score filtering for image searches (vector similarity), not text searches (metadata)
+            if search_type == "image" and score <= 0.6:
+                print(f"DEBUG: Filtering out image search result with score {score:.3f} (<= 0.6)")
                 metadata_text += f"--- Result {i + 1} (FILTERED OUT) ---\n"
                 metadata_text += f"**File Path:** {image_path}\n"
                 metadata_text += f"**Score:** {score:.3f} (<= 0.6 - filtered out)\n\n"
                 continue
+            else:
+                print(f"DEBUG: Keeping metadata search result with score {score:.3f} (no score filter for text search)")
 
             if image_path and os.path.exists(image_path):
                 try:

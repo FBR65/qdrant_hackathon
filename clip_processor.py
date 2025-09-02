@@ -94,6 +94,10 @@ class CLIPProcessor:
                 )
                 embedding = image_features.cpu().numpy().flatten()
 
+            # DEBUG: Log embedding information
+            print(f"DEBUG: CLIP model embedding dimension: {len(embedding)}")
+            print(f"DEBUG: CLIP model name: {self.model_name}")
+            
             return embedding, None
 
         except Exception as e:
@@ -110,7 +114,7 @@ class CLIPProcessor:
             Text embedding as numpy array
         """
         try:
-            # Use CLIP model for text embeddings to ensure 512-dimensional output
+            # Use CLIP model for text embeddings
             inputs = self.processor(text=[text], return_tensors="pt", padding=True)
             inputs = {k: v.to(self.device) for k, v in inputs.items()}
 
@@ -124,6 +128,9 @@ class CLIPProcessor:
                 )
                 embedding = text_features.cpu().numpy().flatten()
 
+            # DEBUG: Log embedding information
+            print(f"DEBUG: CLIP text embedding dimension: {len(embedding)}")
+            
             return embedding
         except Exception as e:
             print(f"Error getting text embedding: {e}")
@@ -191,11 +198,15 @@ class CLIPProcessor:
 
     def get_model_info(self) -> Dict[str, Any]:
         """Get information about the current model."""
+        # Test with a simple text to get actual embedding dimension
+        test_embedding = self.get_text_embedding("test")
+        actual_dim = len(test_embedding) if len(test_embedding) > 0 else 512
+        
         return {
             "model_name": self.model_name,
             "model_path": self.model_path,
             "device": str(self.device),
-            "embedding_dim": 512,  # CLIP-ViT-B-32 produces 512-dimensional embeddings
+            "embedding_dim": actual_dim,  # Use actual dimension from test
             "text_embeddings": "CLIP",  # Using CLIP for text embeddings
             "image_embeddings": "CLIP",  # Using CLIP for image embeddings
             "timestamp": time.time(),

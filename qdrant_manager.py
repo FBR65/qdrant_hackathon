@@ -223,6 +223,7 @@ class QdrantManager:
             # Add text query filter if provided - search in description, location_name, or ai_tags
             if text_query:
                 # Create conditions for each field we want to search in
+                # Since MatchText is case-sensitive, we'll search for both lowercase and uppercase versions
                 description_condition = models.FieldCondition(
                     key="ai_description",
                     match=models.MatchText(text=text_query),
@@ -283,38 +284,66 @@ class QdrantManager:
 
             # Search with filters using the correct method
             try:
+                # First, let's check the actual collection configuration
+                collection_info = self.client.get_collection(collection_name=collection_name)
+                actual_vector_size = collection_info.config.params.vectors.size
+                print(f"DEBUG: Collection {collection_name} actual vector size: {actual_vector_size}")
+                
                 # Use search method instead of query_points for better filter support
+                # Don't use score threshold for metadata search since dummy vectors produce meaningless scores
+                # But keep it for vector similarity searches
                 search_params = {}
                 if score_threshold is not None:
-                    search_params["score_threshold"] = score_threshold
-                    print(
-                        f"DEBUG: Using score threshold {score_threshold} for metadata search"
-                    )
+                    # Only apply score threshold for vector similarity searches, not metadata searches
+                    print("DEBUG: Score threshold not applied for metadata search (dummy vectors)")
+                else:
+                    print("DEBUG: No score threshold provided for metadata search")
 
+                # Use dummy vector with correct dimension to match collection configuration
+                dummy_vector = [0] * actual_vector_size
+                print(f"DEBUG: Using dummy query vector with correct dimension: {len(dummy_vector)}")
+                print(f"DEBUG: Query filter: {query_filter}")
+                
                 search_result = self.client.search(
                     collection_name=collection_name,
-                    query_vector=[0] * 512,  # Dummy query vector
+                    query_vector=dummy_vector,  # Dummy query vector with correct dimension
                     query_filter=query_filter,
                     limit=limit,
                     with_payload=True,
                     **search_params,
                 )
+                print(f"DEBUG: Search method succeeded, result type: {type(search_result)}")
             except Exception as e:
+                print(f"DEBUG: Search method failed with error: {e}")
                 # If search fails, try query_points without score_threshold
-                search_result = self.client.query_points(
-                    collection_name=collection_name,
-                    query=[0] * 512,  # Dummy query vector
-                    query_filter=query_filter,
-                    limit=limit,
-                    with_payload=True,
-                )
+                # Use dummy vector with correct dimension in fallback as well
+                try:
+                    collection_info = self.client.get_collection(collection_name=collection_name)
+                    actual_vector_size = collection_info.config.params.vectors.size
+                    dummy_vector = [0] * actual_vector_size
+                    print(f"DEBUG: Fallback to query_points with correct dummy vector dimension: {len(dummy_vector)}")
+                    print(f"DEBUG: Query filter for fallback: {query_filter}")
+                    
+                    search_result = self.client.query_points(
+                        collection_name=collection_name,
+                        query=dummy_vector,  # Dummy query vector with correct dimension
+                        query_filter=query_filter,
+                        limit=limit,
+                        with_payload=True,
+                    )
+                    print(f"DEBUG: Query_points method succeeded, result type: {type(search_result)}")
+                except Exception as fallback_e:
+                    print(f"DEBUG: Query_points method also failed with error: {fallback_e}")
+                    raise fallback_e
 
             # Process results
             results = []
+            print(f"DEBUG: Processing search results, result type: {type(search_result)}")
 
             # Handle different response formats
             if hasattr(search_result, "points"):
                 # query_points response format
+                print(f"DEBUG: Found {len(search_result.points)} points in query_points response")
                 for point in search_result.points:
                     result = {
                         "id": point.id,
@@ -323,16 +352,18 @@ class QdrantManager:
                         "distance": None,  # No distance for metadata search
                     }
 
-                    # Filter by score threshold if provided
-                    if score_threshold is not None and point.score <= score_threshold:
-                        print(
-                            f"DEBUG: Filtering out metadata result with score {point.score:.3f} (<= {score_threshold})"
-                        )
-                        continue
+                    # Don't filter by score threshold for metadata search since dummy vectors produce meaningless scores
+                    # All metadata matches should be returned
 
                     results.append(result)
+                    print(f"DEBUG: Added result with ID: {point.id}")
             else:
                 # search response format
+                if hasattr(search_result, "__len__"):
+                    print(f"DEBUG: Found {len(search_result)} hits in search response")
+                else:
+                    print(f"DEBUG: Search result doesn't have length attribute")
+                
                 for hit in search_result:
                     result = {
                         "id": hit.id,
@@ -341,14 +372,13 @@ class QdrantManager:
                         "distance": hit.distance if hasattr(hit, "distance") else None,
                     }
 
-                    # Filter by score threshold if provided
-                    if score_threshold is not None and hit.score <= score_threshold:
-                        print(
-                            f"DEBUG: Filtering out metadata result with score {hit.score:.3f} (<= {score_threshold})"
-                        )
-                        continue
+                    # Don't filter by score threshold for metadata search since dummy vectors produce meaningless scores
+                    # All metadata matches should be returned
 
                     results.append(result)
+                    print(f"DEBUG: Added result with ID: {hit.id}, score: {hit.score}")
+
+            print(f"DEBUG: Total results after processing: {len(results)}")
 
             return results, None
 
