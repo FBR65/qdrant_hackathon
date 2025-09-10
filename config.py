@@ -16,9 +16,9 @@ class Config:
     COLLECTION_NAME: str = "image_db"
 
     # Ollama/OpenAI Configuration
-    OLLAMA_BASE_URL: str = "http://localhost:11434/v1/"  # "http://10.84.0.7:8080/v1/" #
+    OLLAMA_BASE_URL: str = "http://localhost:11434/v1/" 
     OLLAMA_MODEL: str = (
-        "mistral-small3.2:latest"  # "mistralai/Mistral-Small-3.2-24B-Instruct-2506" #
+        "mistral-small3.2:latest"
     )
     OLLAMA_API_KEY: str = "na"  # "ollama"
 
